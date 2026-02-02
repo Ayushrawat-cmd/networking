@@ -5,13 +5,25 @@
             "name": "Debug CMake App",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/networking",
+            "program": "${workspaceFolder}/build/client",
             "args": [],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"
-        }
+        },
+        {
+            "name": "Debug CMake server",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/server",
+            "args": [],
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        },
     ]
 }
