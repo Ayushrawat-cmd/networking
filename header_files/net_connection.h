@@ -27,7 +27,6 @@ namespace olc
                 void connectToClient(uint32_t nId){
                     if(m_nOwnerType == owner::server){
                         if(m_socket.is_open()){
-                            std::cout<<"Client: "<<nId<<std::endl;
                             id = nId;
                             readHeader();
                         }
@@ -62,13 +61,11 @@ namespace olc
             
             public:
                 void send(const message<T>& msg){
-                    std::cout<<"Sending Message: "<<msg<<" "<<msg.body.size()<<std::endl;
                     boost::asio::post(m_ioContext, [this, msg](){
                         // sendInternal(msg);
                         bool bWritingMessage = !m_sendQueue.empty();
                         m_sendQueue.push_back(msg);
                         if(!bWritingMessage){ // if we are not already writing a message to prevent asio workload
-                            std::cout<<"Writing Message: "<<msg<<" "<<msg.body.size()<<std::endl;
                             writeHeader(); // basically restart the process
                         }
                     
@@ -90,7 +87,6 @@ namespace olc
                                 // ...it does, so allocate enough space in the messages' body
 								// vector, and issue asio with the task to read the body.
                                 m_recvMessage.body.resize(m_recvMessage.header.size);
-                                std::cout<<"Reading header Message Size: "<<m_recvMessage<<" "<<m_recvMessage.body.size()<<std::endl;
                                 readBody();
                             }
                             else{
@@ -109,7 +105,6 @@ namespace olc
                     boost::asio::async_read(m_socket, boost::asio::buffer(m_recvMessage.body.data(), m_recvMessage.body.size()),
                     [this](std::error_code ec, std::size_t bytes_transferred){
                         if(!ec){
-                            std::cout<<"Reading body Message Size: "<<m_recvMessage<<std::endl;
                             addToIncomingMessageQueue();
                         }
                         else{
@@ -148,7 +143,6 @@ namespace olc
                         boost::asio::buffer(m_sendQueue.front().body),
                         [this](boost::system::error_code ec, std::size_t bytes_transferred) {
                             if (!ec) {
-                                std::cout << "Write SUCCESS: " << bytes_transferred << " bytes" << std::endl;
 
                                 m_sendQueue.pop_front();
                                 if (!m_sendQueue.empty()) {
@@ -164,11 +158,9 @@ namespace olc
 
                 void addToIncomingMessageQueue(){
                     if(m_nOwnerType == owner::server){
-                        std::cout<<"recieved message: "<<m_recvMessage.size()<<std::endl;
                         m_recvQueue.push_back({this->shared_from_this(), m_recvMessage}); // remote socket and message
                     }
                     else{
-                        std::cout<<"recieved message: "<<m_recvMessage.size()<<std::endl;
                         m_recvQueue.push_back({nullptr, m_recvMessage}); // for client
                     }
                     readHeader();

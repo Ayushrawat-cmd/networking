@@ -15,14 +15,14 @@ class CustomServer: public olc::net::ServerInterface<CustomMsgTypes>
         CustomServer(uint16_t port): olc::net::ServerInterface<CustomMsgTypes>(port){}
     public:
         virtual bool onClientConnect(std::shared_ptr<olc::net::Connection<CustomMsgTypes>> client){
-            std::cout<<"Client Connected"<<std::endl;
+            
             return true;
         }
         virtual void onClientDisconnect(std::shared_ptr<olc::net::Connection<CustomMsgTypes>> client){
             std::cout<<"Client Disconnected"<<std::endl;
         }
         virtual void onMessage(std::shared_ptr<olc::net::Connection<CustomMsgTypes>> client,  olc::net::message<CustomMsgTypes>& msg){
-            std::cout<<"["<<client->GetId()<<"]: on message "<<msg<<std::endl;
+            
             switch (msg.header.id)
             {
             case CustomMsgTypes::ServerPing:
@@ -38,7 +38,6 @@ class CustomServer: public olc::net::ServerInterface<CustomMsgTypes>
             default:
                 break;
             }
-            std::cout<<"Message Received: "<<msg<<std::endl;
         }
 };
 

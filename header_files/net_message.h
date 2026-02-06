@@ -41,7 +41,6 @@ namespace olc{
                 std::memcpy(msg.body.data() + i, &data, sizeof(DataType)); // stores the address of the data into the vector
 
                 
-                std::cout<<"Message: "<<msg.body.size()<<std::endl;
                 // recalculate the size of the message and save into header size
                 msg.header.size = msg.size();
                 

@@ -41,7 +41,6 @@ class CustomClient : public olc::net::ClientInterface<CustomMsgTypes>{
             std::chrono::system_clock::time_point time_now = std::chrono::system_clock::now(); // to calc round trip time
 
             msg<<time_now;
-            std::cout<<"Sending Message: "<<msg<<std::endl;
             send(msg);
         }
 
@@ -88,10 +87,8 @@ int main(){
         //     old_key[i] = key[i];
         // }
         if(c.isConnected()){
-            std::cout<<c.getRecvQueue().size()<<std::endl;
             if(!c.getRecvQueue().empty()){
                 auto msg = c.getRecvQueue().pop_front().msg;
-                std::cout<<"Message Received: "<<msg<<std::endl;
                 switch (msg.header.id)
                 {
                 case CustomMsgTypes::ServerPing:{

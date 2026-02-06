@@ -14,7 +14,8 @@ namespace olc{
                 Tsqueue<owned_message<T>> m_recvQueue;
 
                 //container of all connections
-                std::deque<std::shared_ptr<Connection<T>>> m_deqconnections;
+                // std::deque<std::shared_ptr<Connection<T>>> m_deqconnections;
+                std::unordered_map<uint8_t,std::shared_ptr<Connection<T>>>m_mapconnections;
                 
                 // ordered of declaration is important - it is also the order of initialization 
                 boost::asio::io_context m_ioContext;
@@ -64,9 +65,11 @@ namespace olc{
 
                                 // give the user server a chance to deny connection
                                 if(onClientConnect(newconn)){
-                                    m_deqconnections.push_back(std::move(newconn));
-                                    m_deqconnections.back()->connectToClient(nIdCounter++);
-                                    std::cout<<"["<<m_deqconnections.back()->GetId()<<"] Connection approved"<<std::endl;
+                                    // m_deqconnections.push_back(std::move(newconn));
+                                    m_mapconnections[nIdCounter] = std::move(newconn);
+                                    m_mapconnections[nIdCounter]->connectToClient(nIdCounter++);
+                                    // m_deqconnections.back()->connectToClient(nIdCounter++);
+                                    std::cout<<"["<<m_mapconnections[nIdCounter-1]->GetId()<<"] Connection approved"<<std::endl;
                                 }
                             }
                             else{
@@ -84,30 +87,32 @@ namespace olc{
                     else{
                         onClientDisconnect(client);
                         client.reset();
-                        m_deqconnections.erase(std::remove(m_deqconnections.begin(), m_deqconnections.end(), client), m_deqconnections.end());
+                        m_mapconnections.erase(client->GetId());
+                        // m_deqconnections.erase(std::remove(m_deqconnections.begin(), m_deqconnections.end(), client), m_deqconnections.end());
                     }
                 }
                 //send message to all clients
                 void messageAllClients(const message<T>& msg, std::shared_ptr<Connection<T>> except = nullptr){
                     bool bInvalidClientExists = false;
-                    for(auto& client : m_deqconnections){
-                        if (client->isConnected()){
-                            if(client != except){
-                                client->send(msg);
+                    for(auto& client : m_mapconnections){
+                        if (client.second->isConnected()){
+                            if(client.second != except){
+                                client.second->send(msg);
                             }
 
                         }
                         else{
                             bInvalidClientExists = true;
-                            onClientDisconnect(client);
+                            onClientDisconnect(client.second);
                             client.reset();
+                            m_mapconnections.erase(client.second->GetId());
                             
                         }
                     }
 
-                    if(bInvalidClientExists){
-                        m_deqconnections.erase(std::remove(m_deqconnections.begin(), m_deqconnections.end(), nullptr), m_deqconnections.end());// remove null elements
-                    }
+                    // if(bInvalidClientExists){
+                    //     m_deqconnections.erase(std::remove(m_deqconnections.begin(), m_deqconnections.end(), nullptr), m_deqconnections.end());// remove null elements
+                    // }
 
                 }
 
@@ -123,7 +128,6 @@ namespace olc{
                     while(nMessageCount < maxMessages && !m_recvQueue.empty()){
                         auto msg = m_recvQueue.pop_front();
                         // pass to message handler
-                        std::cout<<"["<<msg.remote->GetId()<<"]: update: "<<msg.msg<<" "<<msg.msg.body.size()<<std::endl;
                         onMessage(msg.remote, msg.msg);
                         nMessageCount++;
                     }
