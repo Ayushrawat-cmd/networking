@@ -67,7 +67,7 @@ namespace olc{
                                 if(onClientConnect(newconn)){
                                     // m_deqconnections.push_back(std::move(newconn));
                                     m_mapconnections[nIdCounter] = std::move(newconn);
-                                    m_mapconnections[nIdCounter]->connectToClient(nIdCounter++);
+                                    m_mapconnections[nIdCounter]->connectToClient(this,nIdCounter++);
                                     // m_deqconnections.back()->connectToClient(nIdCounter++);
                                     std::cout<<"["<<m_mapconnections[nIdCounter-1]->GetId()<<"] Connection approved"<<std::endl;
                                 }
@@ -104,7 +104,7 @@ namespace olc{
                         else{
                             bInvalidClientExists = true;
                             onClientDisconnect(client.second);
-                            client.reset();
+                            client.second.reset();
                             m_mapconnections.erase(client.second->GetId());
                             
                         }
@@ -122,7 +122,7 @@ namespace olc{
 
                     //     m_recvQueue.wait();
                     // }
-                    if (bWait) m_recvQueue.wait();
+                    if (bWait) m_recvQueue.wait(); // big adv. of reducing cpu utilisagtion by making thread to sleep if no message
                     size_t nMessageCount =0;
     
                     while(nMessageCount < maxMessages && !m_recvQueue.empty()){
@@ -146,6 +146,10 @@ namespace olc{
                 // called when a message is received
                 virtual void onMessage(std::shared_ptr<Connection<T>> client, message<T>& msg){
                     
+                }
+            public:
+                virtual void onClientValidated(std::shared_ptr<Connection<T>> client){
+                       
                 }
             
             

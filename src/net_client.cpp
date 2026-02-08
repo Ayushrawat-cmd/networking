@@ -43,6 +43,11 @@ class CustomClient : public olc::net::ClientInterface<CustomMsgTypes>{
             msg<<time_now;
             send(msg);
         }
+        void messageAll(){
+            olc::net::message<CustomMsgTypes> msg;
+            msg.header.id = CustomMsgTypes::MessageAll;
+            send(msg);
+        }
 
 };
 int readKey()
@@ -62,15 +67,22 @@ int main(){
     bool bQuit = false;
     bool key[3] = {false, false, false};
     bool old_key[3] = {false, false, false};
+
+    // make the console non blocking
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
     while(!bQuit){
         int key = readKey();
         if(key == '1'){
             c.pingServer();
         }
+        if(key == '2'){
+            c.messageAll();
+        }
         if(key == '3'){
             bQuit = true;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        
         // c.pingServer();
         // if(GetForegroundWindow() == GetConsoleWindow()){
         //     key[0] = GetAsyncKeyState('1') & 0x8000;
@@ -91,6 +103,14 @@ int main(){
                 auto msg = c.getRecvQueue().pop_front().msg;
                 switch (msg.header.id)
                 {
+                case CustomMsgTypes::ServerAccept:
+                {
+                    std::cout<<"Server accepted connection"<<std::endl;
+                }
+                    break;
+                case CustomMsgTypes::ServerDeny:
+                    std::cout<<"Server denied connection"<<std::endl;
+                    break;
                 case CustomMsgTypes::ServerPing:{
                     std::chrono::system_clock::time_point time_now = std::chrono::system_clock::now(); // to calc round trip time
                     std::chrono::system_clock::time_point time_then;
@@ -99,6 +119,12 @@ int main(){
                 }
                     /* code */
                     break;
+                case CustomMsgTypes::ServerMessage:{
+                    uint32_t client_id;
+                    msg>>client_id;
+                    std::cout<<"Hello from client ["<<client_id<<"]"<<std::endl;
+                }
+                break;
                 
                 default:
                     break;
@@ -109,6 +135,7 @@ int main(){
             bQuit = true;
             std::cout<<"Server down"<<std::endl;
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     return 0;
 

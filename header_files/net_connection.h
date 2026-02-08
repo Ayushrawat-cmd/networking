@@ -7,6 +7,9 @@ namespace olc
 {
     namespace net
     {
+        template<typename T>
+        class ServerInterface;
+
         template <typename T>
         class Connection : public std::enable_shared_from_this<Connection<T>>{ // it bsically allows the make the shared pointer internally
             public:
@@ -16,19 +19,38 @@ namespace olc
             };
             Connection(owner parent, boost::asio::io_context& ioContext, boost::asio::ip::tcp::socket socket, Tsqueue<owned_message<T>>& recvQueue):m_socket(std::move(socket)), m_ioContext(ioContext), m_recvQueue(recvQueue){
                 m_nOwnerType = parent;
+
+                // validation check
+                if(m_nOwnerType == owner::server){
+                    m_Handshake_out = std::chrono::system_clock::now().time_since_epoch().count();
+                    m_Handshake_check = scramble(m_Handshake_out);
+                }
+                else{
+                    m_Handshake_in = 0;
+                    m_Handshake_check = 0;
+                }
             }
             virtual ~Connection(){}
 
             uint32_t GetId() const{
                 return id;
             }
+            // private:
+                // void readValidation(olc::net::ServerInterface<T>*server);
 
             public:
-                void connectToClient(uint32_t nId){
+                void connectToClient(olc::net::ServerInterface<T>* server, uint32_t nId){
                     if(m_nOwnerType == owner::server){
                         if(m_socket.is_open()){
                             id = nId;
-                            readHeader();
+                            
+                            // a client has attempted to connect to server, but we wishe the client to validate itself
+                            // so first handshake data need to be validated
+                            writeValidation();
+
+                            // Next, issue a task to sit asynchronously and wait for the client to validate itself and read that data to validate
+                            readValidation(server);
+                            // readHeader();
                         }
                     }
                 }
@@ -38,7 +60,8 @@ namespace olc
                         
                         boost::asio::async_connect(m_socket, endpoints, [this](std::error_code ec, boost::asio::ip::tcp::endpoint endpoint){
                             if(!ec){
-                                readHeader();
+                                readValidation();
+                                // readHeader();
                             }
                             else{
                                 std::cerr<<"connect failed: "<<ec.message()<<std::endl;
@@ -74,6 +97,69 @@ namespace olc
 
             
             private:
+                
+                //Encrypt the message
+                uint64_t scramble(uint64_t n_input){
+                    uint64_t out  = n_input ^ 0xDEADBEEFC0DECAFE;
+                    out = (out & 0XF0F0F0F0F0F0F0F0) >> 4 | (out & 0x0F0F0F0F0F0F0F0F) << 4;
+                    return out ^ 0xC0DEFACE12345678;
+
+                }
+                // used by both client and server to write the validation packet
+                void writeValidation(){
+                    boost::asio::async_write(m_socket, boost::asio::buffer(&m_Handshake_out, sizeof(uint64_t)),
+                    [this](boost::system::error_code ec, std::size_t bytes_transferred){
+                        if(!ec){
+                            if(m_nOwnerType == owner::client){
+                                readHeader();
+                            }
+                            else{
+                                std::cout<<"Handshake sent by server"<<" "<<m_Handshake_out<<std::endl;
+                            }
+                            // readValidation(client);
+                        }
+                        else{
+                            std::cerr<<"write validation failed: "<<ec.message()<<std::endl;
+                            disconnect();
+                        }
+                    });
+                }
+
+                void readValidation( olc::net::ServerInterface<T>* server = nullptr){
+                    boost::asio::async_read(m_socket, boost::asio::buffer(&m_Handshake_in, sizeof(uint64_t)),
+                    [this, server](boost::system::error_code ec, std::size_t bytes_transferred){
+                        if(!ec){
+                            if(m_nOwnerType == owner::server){
+                                if(m_Handshake_in == m_Handshake_check){
+                                    // the incoming data from the client is should be the same checked data stored
+                                    std::cout<<"Handshake success"<<std::endl;
+                                    server->onClientValidated(this->shared_from_this());
+
+                                    // sit and reading from the header
+                                    readHeader();
+                                    
+                                }
+                                else{
+                                    std::cerr<<"Handshake failed"<<std::endl;
+                                    disconnect();
+                                }
+                            }
+                            else if(m_nOwnerType == owner::client){
+                                //connection is a client need to scramble it and send to server
+                                std::cout<<"Handshake received by client"<<" "<<m_Handshake_in<<std::endl;
+                                m_Handshake_out = scramble(m_Handshake_in);
+                                writeValidation();
+                            }
+                        }
+                        else{
+                            std::cerr<<"read validation failed: "<<ec.message()<<std::endl;
+                            disconnect();
+                        }
+                    });
+                        // }
+                    
+                }
+
                 // If this function is called, we are expecting asio to wait until it receives
 				// enough bytes to form a header of a message. We know the headers are a fixed
 				// size, so allocate a transmission buffer large enough to store it. In fact, 
@@ -86,6 +172,7 @@ namespace olc
                             if(m_recvMessage.header.size > 0){
                                 // ...it does, so allocate enough space in the messages' body
 								// vector, and issue asio with the task to read the body.
+                                // std::cout<<"Message header received, size: "<<m_recvMessage.header.size<<std::endl;
                                 m_recvMessage.body.resize(m_recvMessage.header.size);
                                 readBody();
                             }
@@ -119,7 +206,7 @@ namespace olc
                     [this](boost::system::error_code ec, std::size_t bytes_transferred){
                         if(!ec){
                             if(m_sendQueue.front().body.size() > 0){
-                                
+                                // std::cout<<"Message header sent, size: "<<m_sendQueue.front().header.size<<std::endl;
                                 writeBody();
                                 
                             }
@@ -184,6 +271,12 @@ namespace olc
                 owner m_nOwnerType = owner::server;
 
                 uint32_t id = 0;
+
+                //Handshake validation
+                uint64_t m_Handshake_out = 0;
+                uint64_t m_Handshake_in = 0;
+                uint64_t m_Handshake_check = 0;
+
             
         };
         
